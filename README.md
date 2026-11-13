@@ -1,5 +1,13 @@
 # Nero_ws
 
+> **Tarea Nero (fork):** la Parte 1 (brazo en simulación moviéndose con ROS 2 y explicación de la comunicación) está en
+> [`docs/Parte1_arquitectura_ROS2.md`](docs/Parte1_arquitectura_ROS2.md).
+>
+> ```bash
+> colcon build && source install/setup.bash
+> ros2 launch nero_ctrl nero_sim_ik.launch.py demo:=true
+> ```
+
 
 ## Quick Start
 
