@@ -18,7 +18,7 @@ source install/setup.bash
 
 > Los modelos MuJoCo del Nero ya vienen en el repo (`src/mujoco/agilex_arm/agilex_nero/` y `src/models_for_simulation/agilex_nero/`), con sus mallas en `assets/`. **No hace falta `mujoco_menagerie`.**
 
-### Opción A: todo con un comando (recomendado para el video)
+### Opción A
 
 ```bash
 ros2 launch nero_ctrl nero_sim_ik.launch.py demo:=true
@@ -34,27 +34,7 @@ ros2 launch nero_ctrl nero_sim_ik.launch.py                              # solo 
 ros2 launch nero_ctrl nero_sim_ik.launch.py demo:=true rviz:=false
 ```
 
-### Opción B: paso a paso (más fácil para explicar la arquitectura)
 
-```bash
-# Terminal 1: simulador + main_node + can_module (el launch del README)
-ros2 launch nero_ctrl nero_can_ctrl.launch.py mode:=sim
-
-# Terminal 2: nodo de cinemática inversa
-ros2 run nero_ctrl ik_node
-
-# Terminal 3: mandar un objetivo a mano [x, y, z, roll, pitch, yaw] (marco mundo = base_link)
-ros2 topic pub --once /input_obj_position std_msgs/msg/Float64MultiArray \
-  "{data: [-0.35, 0.15, 0.40, -1.5708, 0.0, 3.1416]}"
-
-#   pinza hacia abajo:
-ros2 topic pub --once /input_obj_position std_msgs/msg/Float64MultiArray \
-  "{data: [-0.40, 0.0, 0.20, 0.0, 1.5708, -1.5708]}"
-
-# o lanzar la demo automática
-ros2 run nero_ctrl parte1_demo                         # modo ik
-ros2 run nero_ctrl parte1_demo --ros-args -p mode:=joint
-```
 
 ### Comandos para mostrar la comunicación en el video o informe
 
