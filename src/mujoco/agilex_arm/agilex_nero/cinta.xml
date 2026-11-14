@@ -51,7 +51,7 @@
       <geom name="motor_dc" type="cylinder" size="0.021 0.03" pos="0.37 -0.076 0.037" euler="90 0 0" material="mat_motor" contype="0" conaffinity="0"/>
 
       <!-- Caja referencial -->
-      <geom name="etiqueta_altura" type="box" size="0.027 0.027 0.027" pos="0 0 0.091" material="mat_etiqueta" contype="0" conaffinity="0"/>
+      <geom name="etiqueta_altura" type="box" size="0.02 0.02 0.02" pos="0 0 0.091" material="mat_etiqueta" contype="0" conaffinity="0"/>
 
     </body>
   </worldbody>
