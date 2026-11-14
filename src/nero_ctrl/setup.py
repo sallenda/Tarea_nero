@@ -33,6 +33,7 @@ setup(
             'controller_node = nero_ctrl.controller_node:main',
 			'ik_node = nero_ctrl.IK_node:main',
 			'parte1_demo = nero_ctrl.parte1_demo:main',
+			'interceptor_node = nero_ctrl.interceptor_node:main',
 		],
 	},
 )

@@ -7,6 +7,10 @@
 > colcon build && source install/setup.bash
 > ros2 launch nero_ctrl nero_sim_ik.launch.py demo:=true
 > ```
+>
+> La Parte 2 (cubo sobre la cinta + intercepción) está en
+> [`docs/Parte2_cinta_intercepcion.md`](docs/Parte2_cinta_intercepcion.md):
+> `ros2 launch nero_ctrl parte2.launch.py`
 
 
 ## Quick Start

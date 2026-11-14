@@ -85,7 +85,12 @@ def launch_setup(context, *args, **kwargs):
                 "bringup_nero.launch.py",
             )
         ),
-        launch_arguments={"scene": scene, "rviz": rviz}.items(),
+        launch_arguments={
+            "scene": scene,
+            "rviz": rviz,
+            "viewer_script": LaunchConfiguration("viewer_script").perform(context),
+            "viewer_args": LaunchConfiguration("viewer_args").perform(context),
+        }.items(),
     )
     # MuJoCo tarda en cargar; si can_module manda la pose inicial antes de que el
     # bridge se haya suscrito a control/move_j, ese mensaje se pierde. Se retrasan
@@ -122,6 +127,16 @@ def generate_launch_description():
             "start_delay",
             default_value="2.0",
             description="Segundos de espera antes de lanzar main_node/can_module (solo mode:=sim)",
+        ),
+        DeclareLaunchArgument(
+            "viewer_script",
+            default_value="",
+            description="Script del simulador (solo mode:=sim; vacio = mujoco_viewer.py)",
+        ),
+        DeclareLaunchArgument(
+            "viewer_args",
+            default_value="",
+            description="Argumentos extra para el script del simulador (solo mode:=sim)",
         ),
         OpaqueFunction(function=launch_setup),
     ])

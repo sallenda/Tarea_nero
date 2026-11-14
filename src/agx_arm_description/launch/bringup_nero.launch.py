@@ -94,7 +94,11 @@ def launch_setup(context, *args, **kwargs):
 
     mujoco_sim = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(mujoco_launch),
-        launch_arguments={"scene": LaunchConfiguration("scene")}.items(),
+        launch_arguments={
+            "scene": LaunchConfiguration("scene"),
+            "viewer_script": LaunchConfiguration("viewer_script"),
+            "viewer_args": LaunchConfiguration("viewer_args"),
+        }.items(),
     )
 
     rsp = Node(
@@ -137,6 +141,16 @@ def generate_launch_description():
             default_value="true",
             choices=["true", "false"],
             description="Lanzar RViz2 (true/false). robot_state_publisher se lanza siempre",
+        ),
+        DeclareLaunchArgument(
+            "viewer_script",
+            default_value="",
+            description="Script del simulador (vacio = mujoco_viewer.py; Parte 2: mujoco_cinta_bridge.py)",
+        ),
+        DeclareLaunchArgument(
+            "viewer_args",
+            default_value="",
+            description="Argumentos extra para el script del simulador",
         ),
         OpaqueFunction(function=launch_setup),
     ])

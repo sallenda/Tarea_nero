@@ -171,7 +171,7 @@ class MujocoBridge(Node):
         self.lin_speed = lin_speed      # m/s (media)
 
         self.get_logger().info(f'Cargando escena MuJoCo: {scene_path}')
-        self.model = mujoco.MjModel.from_xml_path(scene_path)
+        self.model = self._load_model(scene_path)
         if gravcomp and hasattr(self.model, 'body_gravcomp'):
             # El brazo real compensa su propio peso. Con los kp bajos de los actuadores de
             # MuJoCo el brazo se hundia ~5 cm por debajo de lo ordenado; anular la gravedad
@@ -286,6 +286,11 @@ class MujocoBridge(Node):
             f'Comandos: "{control_topic}" (directo), "{move_j_topic}", control/move_p, '
             f'control/move_l, control/move_c. Feedback: "{feedback_topic}" y '
             f'feedback/tcp_pose a {rate_hz} Hz.')
+
+    def _load_model(self, scene_path: str):
+        """Carga el MjModel. Las subclases (p. ej. mujoco_cinta_bridge.py) lo sobreescriben
+        para componer escenas con MjSpec (cinta, cubo, ...)."""
+        return mujoco.MjModel.from_xml_path(scene_path)
 
     # ------------------------------------------------------------------ pinza
     def _set_gripper_locked(self, width):
@@ -643,8 +648,8 @@ class MujocoBridge(Node):
             mujoco.mj_step(self.model, self.data)
 
 
-def main():
-    parser = argparse.ArgumentParser(description='Puente ROS2 <-> MuJoCo para el brazo Nero')
+def build_arg_parser(description='Puente ROS2 <-> MuJoCo para el brazo Nero'):
+    parser = argparse.ArgumentParser(description=description)
     parser.add_argument('scene', help='Ruta absoluta al archivo de escena MuJoCo (.xml)')
     parser.add_argument('--control-topic', default='control/joint_states')
     parser.add_argument('--move-j-topic', default='control/move_j')
@@ -665,13 +670,11 @@ def main():
     parser.add_argument('--flange-zero-identity', action='store_true',
                         default=os.environ.get('NERO_FLANGE_ZERO_IDENTITY', '') in ('1', 'true', 'True'),
                         help='Orientacion de la brida relativa a la pose en cero (identidad con q=0)')
-    args = parser.parse_args()
+    return parser
 
-    rclpy.init(args=sys.argv)
-    bridge = MujocoBridge(args.scene, args.control_topic, args.feedback_topic, args.rate,
-                          args.move_j_topic, args.joint_speed, args.lin_speed,
-                          not args.no_gravcomp, args.flange_offset, args.flange_zero_identity)
 
+def run_bridge(bridge):
+    """Hilo ROS (spin) + bucle de fisica/viewer en el hilo principal, a ritmo real."""
     # rclpy.spin en un hilo aparte; el hilo principal corre el viewer + la fisica
     # (mujoco.viewer.launch_passive debe llamarse desde el hilo principal).
     spin_thread = threading.Thread(target=rclpy.spin, args=(bridge,), daemon=True)
@@ -707,6 +710,17 @@ def main():
     finally:
         bridge.destroy_node()
         rclpy.shutdown()
+
+
+def main():
+    parser = build_arg_parser()
+    args = parser.parse_args()
+
+    rclpy.init(args=sys.argv)
+    bridge = MujocoBridge(args.scene, args.control_topic, args.feedback_topic, args.rate,
+                          args.move_j_topic, args.joint_speed, args.lin_speed,
+                          not args.no_gravcomp, args.flange_offset, args.flange_zero_identity)
+    run_bridge(bridge)
 
 
 if __name__ == '__main__':
