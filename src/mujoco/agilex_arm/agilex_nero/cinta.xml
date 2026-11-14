@@ -1,0 +1,58 @@
+<mujoco model="cinta_transportadora_v2">
+  <asset>
+    <!-- Materiales con acabado realista (brillo metálico vs goma mate) -->
+    <material name="mat_chasis" rgba="0.78 0.80 0.82 1" specular="0.4" shininess="0.5"/>
+    <material name="mat_chasis_interno" rgba="0.35 0.37 0.40 1" specular="0.2" shininess="0.3"/>
+    <material name="mat_banda" rgba="0.13 0.13 0.14 1" specular="0.05" shininess="0.1"/>
+    <material name="mat_goma_negra" rgba="0.07 0.07 0.08 1" specular="0.05" shininess="0.1"/>
+    <material name="mat_motor" rgba="0.72 0.64 0.42 1" specular="0.7" shininess="0.8"/>
+    <material name="mat_etiqueta" rgba="0.95 0.35 0.10 1" specular="0.1" shininess="0.2"/>
+  </asset>
+
+  <worldbody>
+    <!-- Medidas totales exactas: Largo = 0.797m | Ancho = 0.090m | Alto = 0.064m -->
+    <body name="base_cinta" pos="0 0 0">
+
+      <!-- 1. PATAS DE GOMA INFERIORES (elevan el chasis 1.0 cm desde Z=0) -->
+      <geom name="pata_1" type="box" size="0.015 0.008 0.005" pos=" 0.340  0.032 0.005" material="mat_goma_negra" contype="0" conaffinity="0"/>
+      <geom name="pata_2" type="box" size="0.015 0.008 0.005" pos=" 0.340 -0.032 0.005" material="mat_goma_negra" contype="0" conaffinity="0"/>
+      <geom name="pata_3" type="box" size="0.015 0.008 0.005" pos="-0.340  0.032 0.005" material="mat_goma_negra" contype="0" conaffinity="0"/>
+      <geom name="pata_4" type="box" size="0.015 0.008 0.005" pos="-0.340 -0.032 0.005" material="mat_goma_negra" contype="0" conaffinity="0"/>
+
+      <!-- 2. PAREDES LATERALES DEL CHASIS (5.3 cm de alto, de Z=0.010 a Z=0.063; ancho exterior total = 9.0 cm) -->
+      <!-- Pared izquierda (+Y) -->
+      <geom name="pared_izq_recta" type="box" size="0.3720 0.0015 0.0265" pos="0 0.0435 0.0365" material="mat_chasis"/>
+      <geom name="pared_izq_frente" type="cylinder" size="0.0265 0.0015" pos=" 0.3720 0.0435 0.0365" euler="90 0 0" material="mat_chasis" contype="0" conaffinity="0"/>
+      <geom name="pared_izq_atras" type="cylinder" size="0.0265 0.0015" pos="-0.3720 0.0435 0.0365" euler="90 0 0" material="mat_chasis" contype="0" conaffinity="0"/>
+
+      <!-- Pared derecha (-Y) -->
+      <geom name="pared_der_recta" type="box" size="0.3720 0.0015 0.0265" pos="0 -0.0435 0.0365" material="mat_chasis"/>
+      <geom name="pared_der_frente" type="cylinder" size="0.0265 0.0015" pos=" 0.3720 -0.0435 0.0365" euler="90 0 0" material="mat_chasis" contype="0" conaffinity="0"/>
+      <geom name="pared_der_atras" type="cylinder" size="0.0265 0.0015" pos="-0.3720 -0.0435 0.0365" euler="90 0 0" material="mat_chasis" contype="0" conaffinity="0"/>
+
+      <!-- Estructura interna y tapas frontales -->
+      <geom name="cama_interna" type="box" size="0.3720 0.0420 0.0220" pos="0 0 0.0360" material="mat_chasis_interno" contype="0" conaffinity="0"/>
+      
+      <!-- 3. BANDA DE GOMA TRANSPORTADORA (superficie superior exacta a Z = 0.064 m = 6.4 cm) -->
+      <!-- Superficie plana activa (única con fricción/colisión principal para objetos) -->
+      <geom name="banda_superior" type="box" size="0.3720 0.0410 0.0030" pos="0 0 0.0610" material="mat_banda" friction="1.0 0.005 0.0001"/>
+      <!-- Curvatura de la banda sobre los rodillos delantero y trasero -->
+      <geom name="rodillo_banda_frente" type="cylinder" size="0.0260 0.0410" pos=" 0.3720 0 0.0380" euler="90 0 0" material="mat_banda" contype="0" conaffinity="0"/>
+      <geom name="rodillo_banda_atras" type="cylinder" size="0.0260 0.0410" pos="-0.3720 0 0.0380" euler="90 0 0" material="mat_banda" contype="0" conaffinity="0"/>
+
+      <!-- 4. DETALLES DE REALISMO (solo visuales: contype="0" conaffinity="0") -->
+      <!-- Bloques tensores laterales negros -->
+      <geom name="tensor_frente_izq" type="box" size="0.022 0.002 0.006" pos=" 0.345  0.046 0.048" material="mat_goma_negra" contype="0" conaffinity="0"/>
+      <geom name="tensor_frente_der" type="box" size="0.022 0.002 0.006" pos=" 0.345 -0.046 0.048" material="mat_goma_negra" contype="0" conaffinity="0"/>
+      <geom name="tensor_atras_izq"  type="box" size="0.022 0.002 0.006" pos="-0.345  0.046 0.048" material="mat_goma_negra" contype="0" conaffinity="0"/>
+      <geom name="tensor_atras_der"  type="box" size="0.022 0.002 0.006" pos="-0.345 -0.046 0.048" material="mat_goma_negra" contype="0" conaffinity="0"/>
+
+      <!-- Motor eléctrico lateral trasero -->
+      <geom name="motor_dc" type="cylinder" size="0.021 0.03" pos="0.37 -0.076 0.037" euler="90 0 0" material="mat_motor" contype="0" conaffinity="0"/>
+
+      <!-- Caja referencial -->
+      <geom name="etiqueta_altura" type="box" size="0.027 0.027 0.027" pos="0 0 0.091" material="mat_etiqueta" contype="0" conaffinity="0"/>
+
+    </body>
+  </worldbody>
+</mujoco>
