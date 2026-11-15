@@ -34,8 +34,7 @@ void PWM_Mode() {
     }
     else {
       DistanceMeasured = LowLevelTime / 50;
-      //Serial.print(DistanceMeasured);
-      //Serial.println("cm");
+      Serial.println(DistanceMeasured);
     }
   } 
   else { 

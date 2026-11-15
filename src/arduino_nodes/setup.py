@@ -11,7 +11,7 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
     ],
-    install_requires=['setuptools'],
+    install_requires=['setuptools', 'pyserial'],
     zip_safe=True,
     maintainer='ubuntu',
     maintainer_email='jquimi@uc.cl',
@@ -24,7 +24,7 @@ setup(
     },
     entry_points={
     'console_scripts': [
-        'serial_bridge = tu_paquete.serial_bridge:main',
+        'serial_connection = arduino_nodes.serial_connection:main',
     ],
     },
 )
