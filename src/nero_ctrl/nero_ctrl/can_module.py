@@ -52,7 +52,12 @@ class CanModule(Node):
         
         # subscribers
         self.create_subscription(Float64MultiArray, 'test_pos', self.test_pos_callback, 10)
-        self.create_subscription(Bool, 'start_running_nodes', self.start_node_callback, 10)
+        self.create_subscription(
+            Bool,
+            'start_running_nodes',
+            self.start_node_callback,
+            self.init_node_qos,
+        )
         self.create_subscription(JointState, 'feedback/joint_states', self.joint_states_callback, ik_qos)
         self.create_subscription(JointState, 'ik/ik_result', self.ik_result_callback, ik_qos)
         self.initial_pose_timer = self.create_timer(0.25, self._publish_initial_pose_when_ready)
