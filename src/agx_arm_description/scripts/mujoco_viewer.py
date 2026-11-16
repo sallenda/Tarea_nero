@@ -691,9 +691,15 @@ def run_bridge(bridge):
             while viewer.is_running() and rclpy.ok():
                 bridge.step()
                 now = time.perf_counter()
+                ahead = (bridge.data.time - sim_ref) - (now - wall_ref)
 
-                # Refrescar la ventana ~60 Hz (no en cada paso de fisica: sync es caro).
-                if now - last_sync >= 1.0 / 60.0:
+                # Refrescar la ventana (no en cada paso: viewer.sync() espera al hilo de
+                # render y cuesta ~10 ms). A 60 Hz se comia mas de la mitad del tiempo y,
+                # con el resto de los nodos corriendo, la fisica quedaba atrasada (~0.4x
+                # tiempo real: el cubo de la cinta parecia quieto). Si la fisica va
+                # atrasada se refresca a 15 Hz para que alcance el tiempo real.
+                sync_period = 1.0 / 30.0 if ahead > -0.01 else 1.0 / 15.0
+                if now - last_sync >= sync_period:
                     viewer.sync()
                     last_sync = now
 
@@ -704,6 +710,16 @@ def run_bridge(bridge):
                 elif ahead < -0.5:
                     sim_ref = bridge.data.time
                     wall_ref = time.perf_counter()
+
+                # Informe del factor de tiempo real cada 5 s (avisa si la PC no da abasto).
+                if now - last_report >= 5.0:
+                    rtf = (bridge.data.time - report_sim) / (now - last_report)
+                    if rtf < 0.9:
+                        bridge.get_logger().warn(
+                            f'Simulacion a {rtf:.2f}x tiempo real (la PC no alcanza): '
+                            f'todo se ve mas lento (cubo, brazo).')
+                    last_report = now
+                    report_sim = bridge.data.time
 
     except KeyboardInterrupt:
         pass
