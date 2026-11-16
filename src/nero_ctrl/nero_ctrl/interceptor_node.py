@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-interceptor_node.py — Tarea Nero, Parte 2: interceptar el cubo sobre la cinta
-==============================================================================
+interceptor_node.py — Tarea Nero, Partes 2 y 3: interceptar y agarrar el cubo sobre la cinta
+============================================================================================
 Lee la pose del cubo que se mueve en linea recta a velocidad constante, estima su
 velocidad, predice su trayectoria y lleva la pinza a encontrarse con el cubo en un
 punto de esa trayectoria, usando la arquitectura ROS 2 del repo:
@@ -31,8 +31,15 @@ Maquina de estados:
   ESPERA       pinza sobre la cinta (pose de espera); espera que el cubo entre a la ventana
   ALINEANDO    sigue al cubo desde arriba (z_above), apuntando a su posicion predicha
   BAJANDO      baja en t_descend segundos sin dejar de seguir al cubo
-  INTERCEPTADO pinza alrededor del cubo; lo acompana t_hold segundos (Parte 3: cerrar aqui)
+  INTERCEPTADO pinza alrededor del cubo; lo acompana t_hold segundos (Parte 2)
   SUBIENDO     vuelve a z_above y despues a ESPERA; espera la siguiente vuelta del cubo
+
+  Con grasp:=true (Parte 3), desde INTERCEPTADO (despues de t_center s acompanando):
+  CERRANDO     cierra la pinza sin dejar de seguir al cubo, hasta que el ancho medido se estabiliza
+  LEVANTANDO   sube el cubo hasta z_lift
+  SOSTENIENDO  lo muestra arriba t_show s y verifica con cube/pose que el cubo subio con la pinza
+  DEJANDO      lo baja de nuevo a la cinta (place_back:=true) en el mismo punto
+  SOLTANDO     abre la pinza; el cubo sigue en la cinta y se espera la siguiente vuelta
 
 Topicos:
   Suscribe  cube/pose               geometry_msgs/PoseStamped (posicion del cubo, base_link)
@@ -45,11 +52,13 @@ Topicos:
             control/move_j          sensor_msgs/JointState     (solo 'gripper': abrir)
             parte2/estado           std_msgs/String            (estado de la maquina)
             parte2/interceptado     std_msgs/Bool              (True al interceptar)
+            parte3/agarrado         std_msgs/Bool              (True con el cubo levantado)
             parte2/markers          visualization_msgs/MarkerArray (prediccion + punto de intercepcion)
 
 Uso:
   ros2 run nero_ctrl interceptor_node
   ros2 run nero_ctrl interceptor_node --ros-args -p lead:=0.5 -p window_y_min:=-0.2
+  ros2 run nero_ctrl interceptor_node --ros-args -p grasp:=true          # Parte 3
 """
 
 import collections
@@ -130,12 +139,22 @@ class InterceptorNode(Node):
         self.standby = list(dp('standby_xyz', [-0.45, 0.0, 0.17]).value)
         self.startup_delay = float(dp('startup_delay', 3.0).value)
         self.loop = bool(dp('loop', True).value)
+        # ---- Parte 3: agarrar y recoger el cubo
+        self.grasp = bool(dp('grasp', False).value)
+        self.gripper_close = float(dp('gripper_close', 0.0).value)   # ancho comandado al cerrar (m)
+        self.t_center = float(dp('t_center', 0.6).value)    # s acompanando antes de cerrar
+        self.t_close = float(dp('t_close', 1.2).value)      # s maximo cerrando
+        self.z_lift = float(dp('z_lift', 0.22).value)       # altura del pinch_site al levantar
+        self.t_lift = float(dp('t_lift', 1.5).value)
+        self.t_show = float(dp('t_show', 2.0).value)        # s mostrando el cubo arriba
+        self.place_back = bool(dp('place_back', True).value)  # devolver el cubo a la cinta
 
         latched = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
         self.target_pub = self.create_publisher(Float64MultiArray, 'input_obj_position', 10)
         self.move_j_pub = self.create_publisher(JointState, 'control/move_j', 10)
         self.state_pub = self.create_publisher(String, 'parte2/estado', latched)
         self.hit_pub = self.create_publisher(Bool, 'parte2/interceptado', latched)
+        self.grasp_pub = self.create_publisher(Bool, 'parte3/agarrado', latched)
         self.marker_pub = self.create_publisher(MarkerArray, 'parte2/markers', 10)
 
         self.create_subscription(PoseStamped, 'cube/pose', self._on_cube, 10)
@@ -168,6 +187,13 @@ class InterceptorNode(Node):
         self.hit_point = None
         self.hit_errors = []
         self.n_intercepts = 0
+        self.n_grasps = 0
+        self.cmd_width = self.gripper_open
+        self.gw = None            # ancho medido de la pinza (feedback 'gripper')
+        self.gw_hist = collections.deque(maxlen=20)
+        self.hold_xy = None
+        self.z_cube_belt = None
+        self.z_grasp_cmd = None
 
         self._set_state('INICIO')
         self.create_timer(0.05, self._tick)   # 20 Hz
@@ -194,6 +220,9 @@ class InterceptorNode(Node):
         pos = dict(zip(msg.name, msg.position))
         if all(n in pos for n in ARM_JOINTS):
             self.q = np.array([pos[n] for n in ARM_JOINTS])
+        if 'gripper' in pos:
+            self.gw = float(pos['gripper'])
+            self.gw_hist.append(self.gw)
         vel = dict(zip(msg.name, msg.velocity)) if msg.velocity else {}
         self.qd = np.array([vel.get(n, 0.0) for n in ARM_JOINTS])
         if self.first_fb is None:
@@ -258,7 +287,7 @@ class InterceptorNode(Node):
         js = JointState()
         js.header.stamp = self.get_clock().now().to_msg()
         js.name = ARM_JOINTS + ['gripper']
-        js.position = [float(v) for v in q] + [self.gripper_open]
+        js.position = [float(v) for v in q] + [self.cmd_width]
         js.effort = [0.0] * 7 + [1.0]
         self.ik_result_pub.publish(js)
 
@@ -292,6 +321,7 @@ class InterceptorNode(Node):
                      and (self.tik is not None or self.tracking == 'ik_node'))
             if ready:
                 self.get_logger().info('Abriendo la pinza y yendo a la pose de espera sobre la cinta.')
+                self.cmd_width = self.gripper_open
                 self._open_gripper()
                 self._set_state('ABRIENDO')
             return
@@ -300,6 +330,10 @@ class InterceptorNode(Node):
             if el > 1.0:   # deja que el feedback ya traiga la pinza abierta antes de pedir IK
                 self._send(self.standby, force=True)
                 self._set_state('ESPERA')
+            return
+
+        if self.state in ('CERRANDO', 'LEVANTANDO', 'SOSTENIENDO', 'DEJANDO', 'SOLTANDO'):
+            self._tick_grasp(now, el, fit)
             return
 
         if self.state == 'ESPERA':
@@ -381,6 +415,14 @@ class InterceptorNode(Node):
         if self.state == 'INTERCEPTADO':
             self._track([p_cmd[0], p_cmd[1], z_grasp])
             self.hit_errors.append(np.linalg.norm(self.pinch - np.array([p_now[0], p_now[1], z_grasp])))
+            if self.grasp and el > self.t_center:
+                self.get_logger().info('Parte 3: cerrando la pinza sobre el cubo (sin dejar de seguirlo).')
+                self.cmd_width = self.gripper_close
+                self.z_cube_belt = float(p_now[2])
+                self.z_grasp_cmd = float(z_grasp)
+                self.hit_pub.publish(Bool(data=False))
+                self._set_state('CERRANDO')
+                return
             if el > self.t_hold:
                 e = np.array(self.hit_errors) * 1000
                 self.get_logger().info(
@@ -403,6 +445,86 @@ class InterceptorNode(Node):
                     self._set_state('FIN')
                 else:
                     self._set_state('ESPERA')
+            return
+
+    # ------------------------------------------------------------------ Parte 3
+    def _gripper_settled(self):
+        if len(self.gw_hist) < self.gw_hist.maxlen:
+            return False
+        h = np.array(self.gw_hist)
+        return float(h.max() - h.min()) < 5e-4
+
+    def _tick_grasp(self, now, el, fit):
+        _t, cube = self.est.last()
+
+        if self.state == 'CERRANDO':
+            # Se sigue acompanando al cubo mientras los dedos se cierran.
+            if fit is not None:
+                p_cmd = self._predict(fit, now + self.lead)
+                self._track([p_cmd[0], p_cmd[1], self.z_grasp_cmd])
+            else:
+                self._track([self.pinch[0], self.pinch[1], self.z_grasp_cmd])
+            closed_on_cube = (self.gw is not None and el > 0.4 and self._gripper_settled())
+            if closed_on_cube or el > self.t_close:
+                w = self.gw if self.gw is not None else float('nan')
+                self.get_logger().info(f'Pinza cerrada: ancho medido {w * 1000:.1f} mm. Levantando el cubo.')
+                self.hold_xy = self.pinch[:2].copy()
+                self.z_from = self.pinch[2]
+                self._set_state('LEVANTANDO')
+            return
+
+        if self.state == 'LEVANTANDO':
+            f = min(1.0, el / self.t_lift)
+            f = f * f * (3 - 2 * f)
+            z = self.z_from + (self.z_lift - self.z_from) * f
+            self._track([self.hold_xy[0], self.hold_xy[1], z])
+            if el > self.t_lift + 0.3:
+                self._set_state('SOSTENIENDO')
+            return
+
+        if self.state == 'SOSTENIENDO':
+            self._track([self.hold_xy[0], self.hold_xy[1], self.z_lift])
+            if el > 0.5 and not getattr(self, '_grasp_reported', False):
+                self._grasp_reported = True
+                lifted = cube is not None and cube[2] - self.z_cube_belt > 0.05
+                gap = np.linalg.norm(cube - self.pinch) * 1000 if cube is not None else float('nan')
+                if lifted:
+                    self.n_grasps += 1
+                    self.get_logger().info(
+                        f'*** CUBO RECOGIDO #{self.n_grasps}: cubo a z = {cube[2]:.3f} m '
+                        f'({(cube[2] - self.z_cube_belt) * 100:.1f} cm sobre la cinta), '
+                        f'a {gap:.1f} mm del pinch_site ***')
+                    self.grasp_pub.publish(Bool(data=True))
+                else:
+                    self.get_logger().warn('El cubo NO subio con la pinza (agarre fallido).')
+            if el > self.t_show:
+                self._grasp_reported = False
+                if self.place_back:
+                    self.z_from = self.pinch[2]
+                    self._set_state('DEJANDO')
+                else:
+                    self._set_state('SOLTANDO')
+            return
+
+        if self.state == 'DEJANDO':
+            # Devuelve el cubo a la cinta en el mismo punto (sigue su camino y da otra vuelta).
+            z_place = self.z_grasp_cmd + 0.004
+            f = min(1.0, el / self.t_lift)
+            f = f * f * (3 - 2 * f)
+            z = self.z_from + (z_place - self.z_from) * f
+            self._track([self.hold_xy[0], self.hold_xy[1], z])
+            if el > self.t_lift + 0.3:
+                self._set_state('SOLTANDO')
+            return
+
+        if self.state == 'SOLTANDO':
+            self.cmd_width = self.gripper_open
+            self._track([self.hold_xy[0], self.hold_xy[1], self.z_grasp_cmd + 0.004])
+            if el > 0.8:
+                self.grasp_pub.publish(Bool(data=False))
+                self.z_from = self.pinch[2]
+                self.lap_resets = self.est.resets
+                self._set_state('SUBIENDO')
             return
 
     # ------------------------------------------------------------------ RViz

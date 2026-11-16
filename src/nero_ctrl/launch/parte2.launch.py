@@ -15,6 +15,7 @@ Ejemplos:
   ros2 launch nero_ctrl parte2.launch.py cube_dir:=1            # el cubo va de -y a +y
   ros2 launch nero_ctrl parte2.launch.py interceptor:=false     # solo la escena (cubo moviendose)
   ros2 launch nero_ctrl parte2.launch.py tracking:=ik_node      # seguir con ik_node (comparacion)
+  ros2 launch nero_ctrl parte2.launch.py grasp:=true            # = parte3.launch.py
 
 En otra terminal, durante la simulacion:
   ros2 topic pub --once /conveyor/speed std_msgs/msg/Float64 "{data: 0.05}"
@@ -70,6 +71,7 @@ def launch_setup(context, *args, **kwargs):
         output='screen',
         parameters=[{
             'tracking': arg('tracking'),
+            'grasp': arg('grasp') == 'true',
             'standby_xyz': [float(arg('cinta_x')), float(arg('cinta_y')), 0.17],
         }],
         condition=IfCondition(arg('interceptor')),
@@ -98,6 +100,8 @@ def generate_launch_description():
         DeclareLaunchArgument('cube_start_delay', default_value='8.0',
                               description='Segundos que el cubo espera antes de partir'),
         DeclareLaunchArgument('interceptor', default_value='true', choices=['true', 'false']),
+        DeclareLaunchArgument('grasp', default_value='false', choices=['true', 'false'],
+                              description='Parte 3: cerrar la pinza, levantar el cubo y devolverlo a la cinta'),
         DeclareLaunchArgument('tracking', default_value='interno', choices=['interno', 'ik_node'],
                               description='IK para seguir al cubo: interno (tracking_ik) o ik_node'),
         OpaqueFunction(function=launch_setup),

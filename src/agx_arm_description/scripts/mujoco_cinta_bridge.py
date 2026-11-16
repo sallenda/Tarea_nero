@@ -140,6 +140,16 @@ class CintaBridge(mv.MujocoBridge):
             if body.name and body.name != 'world':
                 body.gravcomp = 1.0
 
+        # Pinza mas firme (Parte 3): con kp=40 y frictionloss=1 del MJCF, el dedo se detiene
+        # cuando kp*error ~ 1 N y NO alcanza a apretar el cubo (queda a ~51 mm de apertura).
+        # Con kp mayor (limitado igual a +-10 N por forcerange) la pinza aprieta el cubo.
+        if a.gripper_kp > 0:
+            for act in spec.actuators:
+                if act.name == 'gripper':
+                    act.gainprm[0] = a.gripper_kp
+                    act.biasprm[1] = -a.gripper_kp
+                    act.biasprm[2] = -a.gripper_kv
+
         # Cinta del grupo (cinta.xml), en el mismo directorio que la escena.
         cinta_path = a.cinta_xml or os.path.join(os.path.dirname(scene_path), 'cinta.xml')
         spec_cinta = mujoco.MjSpec.from_file(cinta_path)
@@ -341,6 +351,9 @@ def main():
                         help='Desplazamiento lateral del cubo respecto al centro de la banda (m)')
     parser.add_argument('--cube-start-delay', type=float, default=8.0,
                         help='Segundos (tiempo simulado) que el cubo espera antes de partir')
+    parser.add_argument('--gripper-kp', type=float, default=300.0,
+                        help='Ganancia del actuador de la pinza (MJCF original: 40; 0 = no cambiar)')
+    parser.add_argument('--gripper-kv', type=float, default=10.0, help='Amortiguamiento de la pinza')
     parser.add_argument('--no-loop', action='store_true',
                         help='No devolver el cubo al inicio al llegar al final')
     args, _ros_args = parser.parse_known_args()

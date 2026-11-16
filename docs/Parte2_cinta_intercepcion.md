@@ -221,3 +221,5 @@ Sin argumentos nuevos todo funciona como antes: la Parte 1 (`nero_sim_ik.launch.
 
 - `interceptor_node` supone que la cinta va a lo largo del eje y (la ventana se define en y). Si se gira la cinta (`cinta_yaw`), hay que ajustar la ventana y la orientación de la pinza.
 - El cubo se mueve de forma cinemática mientras está sobre la banda. Para la Parte 3 eso ya está resuelto: si lo tocan los dos dedos o lo levantan, deja de imponerse el movimiento.
+
+La Parte 3 (cerrar la pinza y recoger el cubo) continúa desde el estado INTERCEPTADO: ver [`Parte3_agarrar_cubo.md`](Parte3_agarrar_cubo.md).

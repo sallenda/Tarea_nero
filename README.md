@@ -11,6 +11,11 @@
 > La Parte 2 (cubo sobre la cinta + intercepción) está en
 > [`docs/Parte2_cinta_intercepcion.md`](docs/Parte2_cinta_intercepcion.md):
 > `ros2 launch nero_ctrl parte2.launch.py`
+>
+> La Parte 3 (cerrar la pinza y recoger el cubo) está en
+> [`docs/Parte3_agarrar_cubo.md`](docs/Parte3_agarrar_cubo.md): `ros2 launch nero_ctrl parte3.launch.py`
+>
+> Comandos para grabar el video de cada parte: [`docs/Comandos_video.md`](docs/Comandos_video.md).
 
 
 ## Quick Start
